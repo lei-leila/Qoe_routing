@@ -15,24 +15,50 @@
 
 from ryu.base import app_manager
 from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller.handler import (CONFIG_DISPATCHER, MAIN_DISPATCHER,
+                                    DEAD_DISPATCHER)
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
-from NetInfo import get_topology
 from ryu.topology import event
 import NetInfo
 import networkx as nx
+from ryu.lib import hub
 
-class SimpleSwitch13(app_manager.RyuApp):
+
+class QoE_controller(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(SimpleSwitch13, self).__init__(*args, **kwargs)
+        super(QoE_controller, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.graph = nx.DiGraph()
+        self.NetInfo = NetInfo.NetInfo()
+        self.datapaths = {}
+        self.monitor_thread = hub.spawn(self._monitor)
+        self.duration = 10
+
+    @set_ev_cls(ofp_event.EventOFPStateChange,
+                [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    def _state_change_handler(self, ev):
+        datapath = ev.datapath
+
+        if ev.state == MAIN_DISPATCHER:
+            if datapath.id not in self.datapaths:
+                self.logger.debug('register datapath: %016x', datapath.id)
+                self.datapaths[datapath.id] = datapath
+        elif ev.state == DEAD_DISPATCHER:
+            if datapath.id in self.datapaths:
+                self.logger.debug('unregister datapath: %016x', datapath.id)
+                del self.datapaths[datapath.id]
+
+    def _monitor(self):
+        while True:
+            hub.sleep(self.duration)
+            print("Getting Topology")
+            self.graph = self.NetInfo.get_topology()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -122,6 +148,6 @@ class SimpleSwitch13(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
 
-    @set_ev_cls(event.EventSwitchEnter)
+    @set_ev_cls(event.EventLinkAdd)
     def update_topo(self, ev):
-        self.graph = get_topology(ev)
+        self.graph = self.NetInfo.get_topology()
