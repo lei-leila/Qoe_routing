@@ -43,7 +43,6 @@ class QoE_controller(app_manager.RyuApp):
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
         datapath = ev.datapath
-        
         if ev.state == MAIN_DISPATCHER:
             if datapath.id not in self.datapaths:
                 self.logger.debug('register datapath: %016x', datapath.id)
@@ -57,7 +56,7 @@ class QoE_controller(app_manager.RyuApp):
         while True:
             hub.sleep(self.duration)
             print("Getting Topology")
-            self.graph = self.NetInfo.get_topology() 
+            self.graph = self.NetInfo.get_topology()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
