@@ -231,6 +231,7 @@ class NetworkAwareness(app_manager.RyuApp):
         self.create_interior_links(links)
         self.create_access_ports()
         self.get_graph(self.link_to_port.keys())
+        
         self.shortest_paths = self.all_k_shortest_paths(
             self.graph, weight='weight', k=CONF.k_paths)
 

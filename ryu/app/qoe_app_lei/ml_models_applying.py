@@ -14,13 +14,13 @@ class MlModles(app_manager.RyuApp):
         
 
 
-        self.link_metrics=pd.read_csv('./data/topoinfo_sintels500.csv')
+        self.link_metrics=pd.read_csv('./data/topoinfo_sintels500.csv')   #the dierectory of the database file
         self.link_metrics.data=self.link_metrics.drop('MPSNR', axis=1)
         self.link_metrics.target=self.link_metrics.MPSNR
 
         min_max_scaler = preprocessing.MinMaxScaler()
         X_minmax = min_max_scaler.fit_transform(self.link_metrics.data)
-        X_train, X_test, y_train, y_test = train_test_split(X_minmax, self.link_metrics.target, test_size=0.2, random_state=2)
+        X_train, X_test, y_train, y_test = train_test_split(X_minmax, self.link_metrics.target, test_size=0.2, random_state=2)  
 
         rf_model = RandomForestRegressor(n_estimators = 100, random_state = 0)
         rf_model.fit(X_train,y_train)
