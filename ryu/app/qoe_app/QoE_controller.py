@@ -199,7 +199,7 @@ class QoE_controller(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        result = self.awareness.get_host_location(dst_ip)
+        result = self.discovery.get_host_location(dst_ip)
         if result:  # host record in access table.
             datapath_dst, out_port = result[0], result[1]
             datapath = self.datapaths[datapath_dst]

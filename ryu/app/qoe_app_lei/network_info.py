@@ -15,6 +15,12 @@ class NetworkInfo(app_manager.RyuApp):
         self.paths = []
         self.switches=[]
         self.links = []
+        self.link_to_port = {} 
+
+    def _discover(self):
+        while True:
+            self.show_topo()
+            hub.sleep(5)
 
     def get_topo(self, ev):
      #   print ("topology changed!!!!!!!!!!!!!!!!!!11")
@@ -30,11 +36,19 @@ class NetworkInfo(app_manager.RyuApp):
         self.network.add_edges_from(self.links)
         print("******************links are:***********",self.links)
 
-        links = get_link(self.topology_api_app, None)
-        self.create_interior_links(links)
-        self.create_access_ports()
-        self.get_graph(self.link_to_port.keys())
+        #links = get_link(self.topology_api_app, None)
+        #self.create_interior_links(links)
+        #self.create_access_ports()
+        #self.get_graph(self.link_to_port.keys())
     
         return self.network
-    
-  
+
+    def create_interior_links(self, link_list):
+        """
+            Create a list of the links and the ports connecting the links
+        """
+        for link in link_list:
+            src = link.src
+            dst = link.dst
+            self.link_to_port[
+                (src.dpid, dst.dpid)] = (src.port_no, dst.port_no)

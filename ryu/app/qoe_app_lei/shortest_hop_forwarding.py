@@ -18,6 +18,10 @@ from ryu.lib.packet import ethernet
 from ryu.topology import event
 from ryu.topology.api import get_switch, get_link
 import networkx as nx
+import signal
+
+
+
 
 class QoeForwarding(app_manager.RyuApp):
     """
@@ -59,28 +63,34 @@ class QoeForwarding(app_manager.RyuApp):
         mod = parser.OFPFlowMod(datapath=datapath, priority= priority, match = match, instructions= inst)
         datapath.send_msg(mod)
 
-    @set_ev_cls(event.EventSwitchEnter, [CONFIG_DISPATCHER, MAIN_DISPATCHER])
+    events = [event.EventLinkAdd]
+    
+    @set_ev_cls(events, MAIN_DISPATCHER)
     def get_topology(self, ev):
+     #   print ("topology changed!!!!!!!!!!!!!!!!!!11")
         switch_list = get_switch(self.topology_api_app, None)
         switches = [switch.dp.id for switch in switch_list]
         self.network.add_nodes_from(switches)
 
         link_list = get_link(self.topology_api_app, None)
+     #   print("******************link list are:***********",link_list)
         links = [(link.src.dpid, link.dst.dpid, {'port':link.src.port_no}) for link in link_list]
         self.network.add_edges_from(links)
         links = [(link.dst.dpid, link.src.dpid, {'port':link.dst.port_no}) for link in link_list]
         self.network.add_edges_from(links)
         print("******************links are:***********",links)
+     
+    
 
 
     # get outport by shortest hop
     def get_out_port(self, datapath, src, dst, in_port):
         dpid = datapath.id
+        
 
         #add link between host and access switch
         if src not in self.network:
             self.network.add_node(src)
-        #    self.network.add_edge(dpid, src, {'port':in_port})
             self.network.add_edge(dpid, src, port=in_port)
             self.network.add_edge(src, dpid)
             self.paths.setdefault(src, {})
@@ -88,11 +98,11 @@ class QoeForwarding(app_manager.RyuApp):
         if dst in self.network:
             if dst not in self.paths[src]:
                 path = nx.shortest_path(self.network, src, dst)
-                self.paths[src][dst] = path
+       #         self.paths[src][dst] = path
 
-            path = self.paths[src][dst]
+        #    path = self.paths[src][dst]
             next_hop = path[path.index(dpid)+1]
-            print ("path:", path)
+            print ("----------------path-----------------:", path)
             out_port= self.network[dpid][next_hop]['port']
         else:
             out_port = datapath.ofproto.OFPP_FLOOD
@@ -121,6 +131,7 @@ class QoeForwarding(app_manager.RyuApp):
       #  self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
 
         self.mac_to_port[dpid][src] = in_port
+       
 
         out_port = self.get_out_port(datapath, src, dst, in_port)
         actions = [parser.OFPActionOutput(out_port)]

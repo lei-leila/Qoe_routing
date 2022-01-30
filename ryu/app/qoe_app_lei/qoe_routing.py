@@ -20,7 +20,7 @@ from ryu.topology import event
 from ryu.topology.api import get_switch, get_link
 import networkx as nx
 import signal
-import network_info
+import network_info, network_metrics
 import ml_models_applying
 from itertools import islice
 import pickle
@@ -40,6 +40,7 @@ class QoeForwarding(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     _CONTEXTS = {
         "network_info": network_info.NetworkInfo,
+        "network_metrics": network_metrics.NetworkMetrics,
         "ml_model": ml_models_applying.MlModles
       }
 
@@ -53,6 +54,7 @@ class QoeForwarding(app_manager.RyuApp):
         self.paths = {}
         self.network_info= kwargs["network_info"]
         self.ml_model = kwargs["ml_model"]
+        self.delay_detector = kwargs["network_metrics"]
         self.path_list = []
         self.link_metrics_list = [[8,7,200,100,0.5,0.2],[6, 9, 50, 132, 0.1, 0.1]]
 
@@ -81,25 +83,16 @@ class QoeForwarding(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     events = [event.EventSwitchEnter]
-    
+    # when the switch enters, or other change of the network happens, network topology information get updated
     @set_ev_cls(events)
     def get_topology(self, ev):
         self.network = self.network_info.get_topo(ev)
-     
-    
 
 
-    def get_graph(self, network):
-        pass
-    def get_paths(self, graph,src, dst):
-        pass
-
-    def get_networkmetrics(self, metrics):
-        pass
-
-    def call_ml(self, metrics, model_name):
-        X_test=np.array(metrics)
-        self.model = pickle.load(open(model_name, 'rb'))
+   # call the ml model here 
+    def call_ml(self, metrics, model_name): #input metrics are list form
+        X_test=np.array(metrics)     #np.array the list metrics
+        self.model = pickle.load(open(model_name, 'rb'))  #load the ml model
         self.qoe = self.model.predict([X_test])
         return self.qoe
 
@@ -111,14 +104,15 @@ class QoeForwarding(app_manager.RyuApp):
         link_metrics =[]
         self.graph  =  graph
         self.path_list =  list(islice(nx.shortest_simple_paths(graph, source=src,
-                                             target=dst),2))
+                                             target=dst),2))                            # break the path
 
         self.model = self.ml_model.filename
 
         print ("++++++++++available paths are +++++++++++++++++++",self.path_list)
         for path in self.path_list:
           
-            link_metrics = self.link_metrics_list[self.path_list.index(path)]
+            #link_metrics = self.link_metrics_list[self.path_list.index(path)]
+            link_metrics = self.delay_detector.get_path_metrics(path)
             print ("*********link metrics is *********", link_metrics)
             qoe_v = self.call_ml(link_metrics,'finalized_model.sav')
             qoe_list.append(qoe_v)
@@ -127,7 +121,7 @@ class QoeForwarding(app_manager.RyuApp):
         print ("@@@@@@@@@@@@@@@@@@@@@@@@@ qoe list is: @@@@@@@@@@@@@@@@",qoe_list)
       
 
-        self.selected_path = self.path_list[qoe_list.index(max(qoe_list))]  
+        self.selected_path = self.path_list[qoe_list.index(max(qoe_list))]  # the selected path is the path with max qoe predicted
 
         return self.selected_path
 
